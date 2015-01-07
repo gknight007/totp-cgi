@@ -307,7 +307,7 @@ def cgimain():
         bad_request(config, 'Reissue via password not enabled')
 
     else:
-        bad_request(config, 'Invalid auth for given action.'))
+        bad_request(config, 'Invalid auth for given action.')
 
     if action in ('reissue', 'reissue_api'):
         # delete existing token
