@@ -128,6 +128,15 @@ def show_login_form(config):
 
     sys.stdout.write(out)
     sys.exit(0)
+def show_delete_page():
+    out = ''
+    sys.stdout.write('Status: 200 OK\n')
+    sys.stdout.write('Content-type: text/html\n')
+    sys.stdout.write('Content-Length: %s\n' % len(out))
+    sys.stdout.write('\n')
+
+    sys.stdout.write(out)
+    sys.exit(0)
 
 def show_reissue_page(config, user):
     templates_dir = config.get('secret', 'templates_dir')
@@ -283,12 +292,12 @@ def cgimain():
     except totpcgi.UserSecretError, ex:
         bad_request(config, 'Existing secret could not be processed: %s' % ex)
 
-    if exists and action not in ('reissue', 'reissue_api'):
+    if exists and action not in ('reissue', 'reissue_api', 'delete'):
         syslog.syslog(syslog.LOG_NOTICE,
             'Secret exists: user=%s, host=%s' % (user, remote_host))
         show_reissue_page(config, user)
 
-    resissue_api_allowed = bool( config.get('pincode', 'allow_password_auth_reset') )
+    passwd_mgmt_allowed = bool( config.get('pincode', 'allow_password_user_mgmt') )
 
     if action == 'reissue':
         # verify token first
@@ -303,20 +312,21 @@ def cgimain():
                     remote_host, str(ex)))
             bad_request(config, 'Token verification failed: %s' % str(ex))
 
-    elif action == 'reissue_api' and not resissue_api_allowed:
-        bad_request(config, 'Reissue via password not enabled')
+    elif action in ('reissue_api', 'delete') and not passwd_mgmt_allowed:
+        bad_request(config, 'User password management not enabled')
 
     else:
         bad_request(config, 'Invalid auth for given action.')
 
-    if action in ('reissue', 'reissue_api'):
+    if action in ('reissue', 'reissue_api', 'delete'):
         # delete existing token
         try:
             backends.secret_backend.delete_user_secret(user)
         except Exception, ex:
             bad_request(config, 'Could not delete existing token for %s: %s'
                     % (user, str(ex)))
-
+    elif action == 'delete':
+        show_delete_page()
     # now generate the secret and store it
     gaus = generate_secret(config)
 
