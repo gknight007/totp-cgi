@@ -229,6 +229,7 @@ def generate_secret(config):
 def cgimain():
     try:
         trust_http_auth = config.getboolean('secret', 'trust_http_auth')
+        trust_api_token = config.getboolean('secret', 'trust_api_token')
     except ConfigParser.NoOptionError:
         trust_http_auth = False
 
@@ -252,6 +253,13 @@ def cgimain():
 
         syslog.syslog(syslog.LOG_NOTICE,
             'Using trust-http-auth for user=%s, host=%s' % (user, remote_host))
+
+    elif trust_api_token and form.getfirst('action') == 'delete':
+        ourApiToken = config.get('secret', 'api_token')
+
+        if not os.environ.has_key('API_TOKEN') or os.environ['API_TOKEN'] != ourApiToken:
+            bad_request(config, '')
+        #FIXME: add check to ensure we have valid API token or fail so mis config != exploit
 
     else:
         must_keys = ('username', 'pincode')
@@ -285,7 +293,8 @@ def cgimain():
     exists = True
 
     try:
-        backends.secret_backend.get_user_secret(user, pincode)
+        if action != 'delete':
+            backends.secret_backend.get_user_secret(user, pincode)
     except totpcgi.UserNotFound, ex:
         # if we got it, then there isn't an existing secret in place
         exists = False
