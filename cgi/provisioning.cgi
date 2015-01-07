@@ -283,10 +283,12 @@ def cgimain():
     except totpcgi.UserSecretError, ex:
         bad_request(config, 'Existing secret could not be processed: %s' % ex)
 
-    if exists and action != 'reissue':
+    if exists and action not in ('reissue', 'reissue_api'):
         syslog.syslog(syslog.LOG_NOTICE,
             'Secret exists: user=%s, host=%s' % (user, remote_host))
         show_reissue_page(config, user)
+
+    resissue_api_allowed = bool( config.get('pincode', 'allow_password_auth_reset') )
 
     if action == 'reissue':
         # verify token first
@@ -301,6 +303,13 @@ def cgimain():
                     remote_host, str(ex)))
             bad_request(config, 'Token verification failed: %s' % str(ex))
 
+    elif action == 'reissue_api' and not resissue_api_allowed:
+        bad_request(config, 'Reissue via password not enabled')
+
+    else:
+        bad_request(config, 'Invalid auth for given action.'))
+
+    if action in ('reissue', 'reissue_api'):
         # delete existing token
         try:
             backends.secret_backend.delete_user_secret(user)
