@@ -221,15 +221,19 @@ def generate_secret(config):
     rate_limit = (int(times), int(secs))
 
     gaus = totpcgi.utils.generate_secret(rate_limit, window_size, 
-        scratch_tokens_n, bs=secret_bits)
+        scratch_tokens_n)
 
     return gaus
 
 
 def cgimain():
+    if config.has_option('secret', 'trust_api_token'):
+      trust_api_token = config.getboolean('secret', 'trust_api_token')
+    else:
+        trust_api_token = False
+
     try:
         trust_http_auth = config.getboolean('secret', 'trust_http_auth')
-        trust_api_token = config.getboolean('secret', 'trust_api_token')
     except ConfigParser.NoOptionError:
         trust_http_auth = False
 
@@ -243,6 +247,7 @@ def cgimain():
         show_qr_code(qrcode)
 
     remote_host = os.environ['REMOTE_ADDR']
+    user = form.getfirst('username')
 
     if trust_http_auth and os.environ.has_key('REMOTE_USER'):
         user = os.environ['REMOTE_USER']
@@ -256,9 +261,12 @@ def cgimain():
 
     elif trust_api_token and form.getfirst('action') == 'delete':
         ourApiToken = config.get('secret', 'api_token')
+        requestApiToken = form.getfirst('API_TOKEN')
+        #if not os.environ.has_key('API_TOKEN') or os.environ['API_TOKEN'] != ourApiToken:
 
-        if not os.environ.has_key('API_TOKEN') or os.environ['API_TOKEN'] != ourApiToken:
-            bad_request(config, '')
+        if 'API_TOKEN' not in form or requestApiToken != ourApiToken:
+            bad_request(config, 'i shat my pants... fix me %s != %s' %(requestApiToken,  ourApiToken))
+
         #FIXME: add check to ensure we have valid API token or fail so mis config != exploit
 
     else:
@@ -323,9 +331,11 @@ def cgimain():
 
     elif action in ('reissue_api', 'delete') and not passwd_mgmt_allowed:
         bad_request(config, 'User password management not enabled')
-
+    elif action in ('reissue_api', 'delete') and passwd_mgmt_allowed: 
+        pass
+    elif action == 'issue': pass
     else:
-        bad_request(config, 'Invalid auth for given action.')
+        bad_request(config, 'Invalid auth for given action. %s && %s' % (action, passwd_mgmt_allowed))
 
     if action in ('reissue', 'reissue_api', 'delete'):
         # delete existing token
@@ -334,7 +344,7 @@ def cgimain():
         except Exception, ex:
             bad_request(config, 'Could not delete existing token for %s: %s'
                     % (user, str(ex)))
-    elif action == 'delete':
+    if action == 'delete':
         show_delete_page()
     # now generate the secret and store it
     gaus = generate_secret(config)
